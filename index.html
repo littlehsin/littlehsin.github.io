@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Capture">
+<meta name="theme-color" content="#050508">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Capture</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;}
+:root{
+  --glass-thin:rgba(255,255,255,.07);
+  --glass-reg:rgba(255,255,255,.12);
+  --glass-thick:rgba(255,255,255,.19);
+  --glass-border:rgba(255,255,255,.15);
+  --text-1:rgba(255,255,255,1);
+  --text-2:rgba(255,255,255,.58);
+  --text-3:rgba(255,255,255,.32);
+  --col-red:rgba(255,110,90,.85);
+  --col-blue:rgba(90,175,255,.85);
+  --col-green:rgba(80,210,130,.85);
+  --col-purple:rgba(175,130,255,.85);
+  --col-yellow:rgba(255,210,70,.85);
+  --col-pink:rgba(255,110,170,.85);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+html,body{height:100%;height:100dvh;overflow:hidden;background:#000;font-family:'Inter',-apple-system,sans-serif;user-select:none;}
+
+/* ── AMBIENT BG ── */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
+.blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.45;}
+.b1{width:420px;height:420px;top:-100px;left:-80px;background:radial-gradient(circle,#1a3a6e,transparent 70%);}
+.b2{width:380px;height:380px;top:35%;right:-80px;background:radial-gradient(circle,#2d1a5e,transparent 70%);}
+.b3{width:340px;height:340px;bottom:-60px;left:20%;background:radial-gradient(circle,#0d3320,transparent 70%);}
+
+/* ── SCREEN ── */
+.screen{position:relative;z-index:1;width:100%;height:100%;height:100dvh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── PAGE STRIP ── */
+.strip{display:flex;width:300%;height:100%;transition:transform .36s cubic-bezier(.4,0,.2,1);will-change:transform;}
+.page{width:calc(100vw);height:100%;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;}
+
+/* DOTS */
+.dots{position:fixed;bottom:calc(8px + var(--safe-bot));left:0;right:0;display:flex;justify-content:center;gap:6px;z-index:100;pointer-events:none;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);transition:all .22s;}
+.dot.on{width:18px;background:rgba(255,255,255,.8);border-radius:3px;}
+
+/* ── STATUS BAR ── */
+.sb{height:calc(50px + var(--safe-top));padding-top:var(--safe-top);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding-left:24px;padding-right:20px;font-size:12px;font-weight:600;color:var(--text-1);}
+.sb-r{display:flex;gap:5px;align-items:center;font-size:11px;}
+
+/* ── GLASS HDR ── */
+.ghdr{padding:10px 18px 12px;flex-shrink:0;background:var(--glass-thin);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-bottom:1px solid var(--glass-border);}
+.ghdr-row{display:flex;align-items:center;gap:10px;}
+.htitle{font-size:17px;font-weight:700;color:var(--text-1);}
+.hsub{font-size:12px;color:var(--text-3);margin-top:2px;}
+
+/* scroll */
+.scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.scr::-webkit-scrollbar{display:none;}
+
+/* ══════════ PAGE 0: PROGRAMS ══════════ */
+.prog-list{padding:10px 14px 80px;}
+.prog-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:16px;background:var(--glass-thin);border:1px solid var(--glass-border);margin-bottom:8px;cursor:pointer;transition:background .15s;-webkit-user-select:none;}
+.prog-row:active{background:var(--glass-reg);}
+.prog-bar{width:3px;height:38px;border-radius:2px;flex-shrink:0;}
+.prog-av{width:46px;height:46px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.04em;}
+.prog-info{flex:1;min-width:0;}
+.prog-name{font-size:14px;font-weight:600;color:var(--text-1);}
+.prog-prev{font-size:12px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prog-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
+.prog-time{font-size:10px;color:var(--text-3);}
+.prog-badge{min-width:20px;height:20px;border-radius:10px;background:rgba(255,255,255,.14);color:var(--text-1);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px;}
+.prog-add{display:flex;align-items:center;justify-content:center;padding:14px;border-radius:16px;border:1.5px dashed rgba(255,255,255,.18);cursor:pointer;margin-bottom:8px;transition:background .15s;}
+.prog-add:active{background:var(--glass-thin);}
+.prog-add span{font-size:13px;color:var(--text-3);}
+
+/* ── ADD PROGRAM SHEET ── */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+.sheet{width:100%;background:#1a1a2e;border-radius:24px 24px 0 0;padding:20px 20px calc(24px + var(--safe-bot));max-height:85vh;overflow-y:auto;}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);margin:0 auto 20px;}
+.sheet-title{font-size:17px;font-weight:700;color:var(--text-1);margin-bottom:18px;}
+.sheet-label{font-size:12px;font-weight:600;color:var(--text-3);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase;}
+.sheet-input{width:100%;background:var(--glass-thin);border:1px solid var(--glass-border);border-radius:14px;padding:12px 16px;color:var(--text-1);font-family:'Inter',-apple-system,sans-serif;font-size:15px;outline:none;margin-bottom:16px;}
+.sheet-input::placeholder{color:var(--text-3);}
+.color-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.color-dot{width:30px;height:30px;border-radius:50%;cursor:pointer;transition:transform .15s;border:2px solid transparent;}
+.color-dot.sel{transform:scale(1.25);border-color:rgba(255,255,255,.6);}
+.sheet-btn{width:100%;padding:15px;border-radius:16px;background:rgba(255,255,255,.88);color:#111;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-top:4px;}
+.sheet-btn:active{opacity:.85;}
+.sheet-btn.danger{background:rgba(255,80,80,.18);color:rgba(255,120,120,.9);margin-top:10px;}
+
+/* ══════════ PAGE 1: CHAT ══════════ */
+.chat-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px 12px;flex-shrink:0;background:var(--glass-thin);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-bottom:1px solid var(--glass-border);}
+.back-btn{width:32px;height:32px;border-radius:50%;background:var(--glass-reg);border:1px solid var(--glass-border);color:var(--text-2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.chat-prog-name{font-size:15px;font-weight:600;color:var(--text-1);}
+.chat-prog-sub{font-size:11px;color:var(--text-3);}
+.chat-prog-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+.messages{flex:1;overflow-y:auto;padding:16px 14px 10px;display:flex;flex-direction:column;gap:2px;}
+.messages::-webkit-scrollbar{display:none;}
+.date-sep{display:flex;align-items:center;gap:8px;margin:8px 0 12px;}
+.date-sep::before,.date-sep::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07);}
+.date-sep span{font-size:10px;color:var(--text-3);font-weight:500;}
+
+.msg-group{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:6px;}
+.msg-time{font-size:10px;color:var(--text-3);margin-bottom:3px;}
+.msg-bubble{max-width:82%;background:var(--glass-reg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:18px 5px 18px 18px;padding:11px 14px;font-size:14px;line-height:1.6;color:var(--text-1);box-shadow:0 3px 16px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.08);word-break:break-word;}
+.msg-img{width:100%;max-width:240px;border-radius:12px;display:block;margin-bottom:4px;cursor:pointer;}
+.msg-audio{display:flex;align-items:center;gap:8px;min-width:200px;}
+.aud-play{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.aud-track{flex:1;height:3px;background:rgba(255,255,255,.12);border-radius:2px;}
+.aud-dur{font-size:10px;color:var(--text-3);flex-shrink:0;}
+.tag{display:inline-block;font-size:10px;font-weight:500;color:rgba(90,175,255,.9);background:rgba(90,175,255,.1);border:1px solid rgba(90,175,255,.2);border-radius:6px;padding:2px 7px;margin:5px 3px 0 0;}
+
+.input-wrap{padding:10px 12px calc(14px + var(--safe-bot));flex-shrink:0;background:var(--glass-thin);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-top:1px solid var(--glass-border);}
+.input-row{display:flex;align-items:flex-end;gap:6px;}
+.med-btn{width:36px;height:36px;border-radius:12px;background:var(--glass-thin);border:1px solid var(--glass-border);color:var(--text-2);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .15s;}
+.med-btn:active{background:var(--glass-reg);}
+.med-btn.rec{background:rgba(255,60,60,.25);border-color:rgba(255,60,60,.4);color:rgba(255,100,100,.9);}
+.input-field{flex:1;background:rgba(255,255,255,.08);border:1px solid var(--glass-border);border-radius:18px;padding:10px 14px;color:var(--text-1);font-family:'Inter',-apple-system,sans-serif;font-size:14px;resize:none;outline:none;min-height:40px;max-height:100px;line-height:1.5;}
+.input-field:focus{border-color:rgba(255,255,255,.3);background:var(--glass-reg);}
+.input-field::placeholder{color:var(--text-3);}
+.send-btn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.88);border:none;color:#111;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;box-shadow:0 2px 12px rgba(255,255,255,.12);}
+.send-btn:active{opacity:.8;}
+.rec-hint{text-align:center;font-size:11px;color:rgba(255,100,100,.8);margin-top:8px;animation:pulse 1s ease infinite;}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+
+/* ══════════ PAGE 2: ORGANISE ══════════ */
+.org-body{flex:1;overflow-y:auto;padding:14px 14px calc(80px + var(--safe-bot));}
+.org-body::-webkit-scrollbar{display:none;}
+.sec-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;padding-left:2px;}
+.source-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:20px;}
+.s-chip{display:flex;align-items:center;gap:6px;background:var(--glass-thin);border:1px solid var(--glass-border);border-radius:20px;padding:7px 14px;cursor:pointer;transition:all .18s;}
+.s-chip.on{background:var(--glass-thick);border-color:rgba(255,255,255,.3);}
+.s-chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.s-chip-name{font-size:12px;font-weight:500;color:var(--text-1);}
+.s-chip-n{font-size:10px;color:var(--text-3);}
+.mm-box{background:var(--glass-thin);border:1px solid var(--glass-border);border-radius:18px;padding:16px;margin-bottom:16px;}
+.mm-ttl{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:12px;text-align:center;}
+.mm-svg{width:100%;height:150px;}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.mode-card{background:var(--glass-thin);border:1px solid var(--glass-border);border-radius:16px;padding:16px 14px;cursor:pointer;transition:all .18s;display:flex;flex-direction:column;gap:6px;}
+.mode-card:active{background:var(--glass-reg);}
+.mode-card.feat{grid-column:1/-1;flex-direction:row;align-items:center;gap:14px;background:var(--glass-reg);}
+.mode-icon{width:40px;height:40px;border-radius:12px;background:var(--glass-reg);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.mode-card.feat .mode-icon{width:48px;height:48px;border-radius:14px;}
+.mode-name{font-size:13px;font-weight:600;color:var(--text-1);}
+.mode-desc{font-size:11px;color:var(--text-3);line-height:1.4;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:calc(80px + var(--safe-bot));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(30,30,50,.95);border:1px solid var(--glass-border);color:var(--text-1);font-size:13px;padding:10px 18px;border-radius:20px;z-index:300;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── IMAGE VIEWER ── */
+.img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;}
+.img-viewer img{max-width:100%;max-height:100%;border-radius:12px;object-fit:contain;}
+.img-viewer-close{position:absolute;top:calc(16px + var(--safe-top));right:16px;width:36px;height:36px;border-radius:50%;background:var(--glass-reg);border:1px solid var(--glass-border);color:var(--text-1);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+
+/* ── EMPTY STATE ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:12px;opacity:.5;}
+.empty-icon{font-size:48px;}
+.empty-text{font-size:14px;color:var(--text-2);text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+
+<div class="screen">
+  <div class="strip" id="strip">
+
+    <!-- ══ PAGE 0: PROGRAMS ══ -->
+    <div class="page" id="p0">
+      <div class="sb">
+        <span id="sb-time">9:41</span>
+        <div class="sb-r"><span>●●●●</span><span>WiFi</span><span>🔋</span></div>
+      </div>
+      <div class="ghdr">
+        <div class="htitle">Programs</div>
+        <div class="hsub">你的靈感分類</div>
+      </div>
+      <div class="scr"><div class="prog-list" id="prog-list">
+        <div class="prog-add" onclick="openAddProgram()"><span>＋ 新增 Program</span></div>
+      </div></div>
+    </div>
+
+    <!-- ══ PAGE 1: CHAT ══ -->
+    <div class="page" id="p1">
+      <div class="sb">
+        <span id="sb-time2">9:41</span>
+        <div class="sb-r"><span>●●●●</span><span>WiFi</span><span>🔋</span></div>
+      </div>
+      <div class="chat-hdr">
+        <div class="back-btn" onclick="goPage(0)">‹</div>
+        <div class="chat-prog-dot" id="chat-dot"></div>
+        <div style="flex:1">
+          <div class="chat-prog-name" id="chat-name">選擇一個 Program</div>
+          <div class="chat-prog-sub" id="chat-sub">0 條靈感</div>
+        </div>
+      </div>
+      <div class="messages" id="messages">
+        <div class="empty"><div class="empty-icon">💬</div><div class="empty-text">選擇左邊的 Program<br>開始記錄靈感</div></div>
+      </div>
+      <div class="input-wrap">
+        <div class="input-row">
+          <div class="med-btn" id="img-btn" onclick="pickImage()" title="圖片">📷</div>
+          <div class="med-btn" id="mic-btn" onclick="toggleRecord()" title="錄音">🎙</div>
+          <textarea class="input-field" id="txt" placeholder="記下靈感..." rows="1"
+            onkeydown="onKey(event)" oninput="grow(this)"></textarea>
+          <button class="send-btn" onclick="sendText()">↑</button>
+        </div>
+        <div class="rec-hint" id="rec-hint" style="display:none">🔴 錄音中，再按一次停止</div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE 2: ORGANISE ══ -->
+    <div class="page" id="p2">
+      <div class="sb">
+        <span id="sb-time3">9:41</span>
+        <div class="sb-r"><span>●●●●</span><span>WiFi</span><span>🔋</span></div>
+      </div>
+      <div class="ghdr">
+        <div class="htitle">組織</div>
+        <div class="hsub">將靈感整理成各種形式</div>
+      </div>
+      <div class="org-body">
+        <div class="sec-label" style="margin-top:4px">選擇來源</div>
+        <div class="source-chips" id="source-chips"></div>
+        <div class="mm-box">
+          <div class="mm-ttl">心智圖預覽</div>
+          <svg class="mm-svg" id="mm-svg"></svg>
+        </div>
+        <div class="sec-label">輸出形式</div>
+        <div class="mode-grid">
+          <div class="mode-card feat"><div class="mode-icon">🗺</div><div><div class="mode-name">心智圖</div><div class="mode-desc">放射狀展開，看見關聯</div></div></div>
+          <div class="mode-card"><div class="mode-icon">📋</div><div class="mode-name">大綱</div><div class="mode-desc">階層式整理</div></div>
+          <div class="mode-card"><div class="mode-icon">📅</div><div class="mode-name">時間軸</div><div class="mode-desc">依時間排列</div></div>
+          <div class="mode-card"><div class="mode-icon">🗂</div><div class="mode-name">看板</div><div class="mode-desc">Kanban 進度欄</div></div>
+          <div class="mode-card"><div class="mode-icon">📝</div><div class="mode-name">文章草稿</div><div class="mode-desc">整理成段落（v2）</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /strip -->
+
+  <div class="dots" id="dots">
+    <div class="dot" onclick="goPage(0)"></div>
+    <div class="dot on" onclick="goPage(1)"></div>
+    <div class="dot" onclick="goPage(2)"></div>
+  </div>
+</div><!-- /screen -->
+
+<!-- ADD PROGRAM SHEET -->
+<div class="sheet-overlay" id="add-sheet" style="display:none" onclick="closeSheet(event)">
+  <div class="sheet" onclick.stop>
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">新增 Program</div>
+    <div class="sheet-label">名稱</div>
+    <input class="sheet-input" id="prog-name-inp" placeholder="例：短影音、日記、靈感庫" maxlength="20">
+    <div class="sheet-label">顏色</div>
+    <div class="color-row" id="color-row"></div>
+    <button class="sheet-btn" onclick="saveProgram()">建立 Program</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- IMAGE VIEWER -->
+<div class="img-viewer" id="img-viewer" style="display:none" onclick="closeImgViewer()">
+  <div class="img-viewer-close" onclick="closeImgViewer()">✕</div>
+  <img id="img-viewer-src" src="" alt="">
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  DATABASE (IndexedDB)
+// ═══════════════════════════════════════
+const DB = (() => {
+  let db
+  const open = () => new Promise((res, rej) => {
+    if (db) return res(db)
+    const r = indexedDB.open('CaptureDB', 2)
+    r.onupgradeneeded = e => {
+      const d = e.target.result
+      if (!d.objectStoreNames.contains('programs')) {
+        const ps = d.createObjectStore('programs', { keyPath: 'id' })
+        ps.createIndex('order', 'order')
+      }
+      if (!d.objectStoreNames.contains('messages')) {
+        const ms = d.createObjectStore('messages', { keyPath: 'id' })
+        ms.createIndex('programId', 'programId')
+        ms.createIndex('createdAt', 'createdAt')
+      }
+    }
+    r.onsuccess = e => { db = e.target.result; res(db) }
+    r.onerror = () => rej(r.error)
+  })
+  const tx = (store, mode = 'readonly') => db.transaction(store, mode).objectStore(store)
+  const p = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error) })
+
+  return {
+    async getPrograms() {
+      await open()
+      const all = await p(tx('programs').getAll())
+      return all.sort((a, b) => (a.order || 0) - (b.order || 0))
+    },
+    async saveProgram(prog) { await open(); return p(tx('programs','readwrite').put(prog)) },
+    async deleteProgram(id) {
+      await open()
+      await p(tx('programs','readwrite').delete(id))
+      const msgs = await p(tx('messages').getAll())
+      const store = tx('messages','readwrite')
+      await Promise.all(msgs.filter(m => m.programId === id).map(m => p(store.delete(m.id))))
+    },
+    async getMessages(pid) {
+      await open()
+      const all = await p(tx('messages').getAll())
+      return all.filter(m => m.programId === pid).sort((a,b) => a.createdAt - b.createdAt)
+    },
+    async saveMessage(msg) {
+      await open()
+      await p(tx('messages','readwrite').put(msg))
+      // update program lastMsg + count
+      const prog = await p(tx('programs').get(msg.programId))
+      if (prog) {
+        prog.lastMsg = msg.type === 'text' ? msg.content : msg.type === 'image' ? '[圖片]' : '[錄音]'
+        prog.lastAt = msg.createdAt
+        prog.count = (prog.count || 0) + 1
+        await p(tx('programs','readwrite').put(prog))
+      }
+    },
+    async deleteMessage(id, pid) {
+      await open()
+      await p(tx('messages','readwrite').delete(id))
+      const prog = await p(tx('programs').get(pid))
+      if (prog && prog.count > 0) { prog.count--; await p(tx('programs','readwrite').put(prog)) }
+    }
+  }
+})()
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const COLORS = [
+  {hex:'rgba(255,110,90,.85)',name:'珊瑚紅'},
+  {hex:'rgba(90,175,255,.85)',name:'天藍'},
+  {hex:'rgba(80,210,130,.85)',name:'薄荷綠'},
+  {hex:'rgba(175,130,255,.85)',name:'薰衣草'},
+  {hex:'rgba(255,210,70,.85)',name:'金黃'},
+  {hex:'rgba(255,110,170,.85)',name:'粉紅'},
+]
+let programs = []
+let currentProg = null
+let messages = []
+let selColor = COLORS[0].hex
+let mediaRec = null
+let recChunks = []
+let isRec = false
+
+// ═══════════════════════════════════════
+//  PAGE NAVIGATION
+// ═══════════════════════════════════════
+let cur = 1
+const strip = document.getElementById('strip')
+const dots = document.querySelectorAll('.dot')
+
+function goPage(n) {
+  cur = Math.max(0, Math.min(2, n))
+  strip.style.transform = `translateX(-${cur * 100 / 3 * 1}%)` // 33.33% per page
+  dots.forEach((d,i) => d.classList.toggle('on', i === cur))
+  if (cur === 2) renderOrg()
+}
+
+// recalc strip for actual vw
+function resizeStrip() {
+  strip.style.width = (window.innerWidth * 3) + 'px'
+  strip.querySelectorAll('.page').forEach(p => p.style.width = window.innerWidth + 'px')
+  goPage(cur)
+}
+window.addEventListener('resize', resizeStrip)
+resizeStrip()
+
+// fix translateX for real pixels
+function goPage(n) {
+  cur = Math.max(0, Math.min(2, n))
+  strip.style.transform = `translateX(-${cur * window.innerWidth}px)`
+  dots.forEach((d,i) => d.classList.toggle('on', i === cur))
+  if (cur === 2) renderOrg()
+}
+
+// SWIPE
+let sx = 0, sy = 0, sw = false
+strip.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; sw = true }, {passive:true})
+strip.addEventListener('touchend', e => {
+  if (!sw) return
+  const dx = e.changedTouches[0].clientX - sx
+  const dy = e.changedTouches[0].clientY - sy
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 44) goPage(dx < 0 ? cur+1 : cur-1)
+  sw = false
+}, {passive:true})
+
+// ═══════════════════════════════════════
+//  PROGRAMS
+// ═══════════════════════════════════════
+async function loadPrograms() {
+  programs = await DB.getPrograms()
+  renderPrograms()
+  renderSourceChips()
+}
+
+function renderPrograms() {
+  const list = document.getElementById('prog-list')
+  list.innerHTML = ''
+  programs.forEach(prog => {
+    const row = document.createElement('div')
+    row.className = 'prog-row'
+    row.innerHTML = `
+      <div class="prog-bar" style="background:${prog.color}"></div>
+      <div class="prog-av" style="background:${prog.color}22;color:${prog.color};border:1px solid ${prog.color}33">${prog.name.slice(0,2)}</div>
+      <div class="prog-info">
+        <div class="prog-name">${esc(prog.name)}</div>
+        <div class="prog-prev">${esc(prog.lastMsg || '還沒有靈感，開始記錄吧')}</div>
+      </div>
+      <div class="prog-meta">
+        <div class="prog-time">${fmtTime(prog.lastAt)}</div>
+        <div class="prog-badge">${prog.count || 0}</div>
+      </div>`
+    row.onclick = () => openChat(prog)
+    row.addEventListener('contextmenu', e => { e.preventDefault(); confirmDelete(prog) })
+    list.appendChild(row)
+  })
+  const addBtn = document.createElement('div')
+  addBtn.className = 'prog-add'
+  addBtn.innerHTML = '<span>＋ 新增 Program</span>'
+  addBtn.onclick = openAddProgram
+  list.appendChild(addBtn)
+}
+
+function openAddProgram() {
+  selColor = COLORS[0].hex
+  document.getElementById('prog-name-inp').value = ''
+  renderColorRow()
+  document.getElementById('add-sheet').style.display = 'flex'
+  setTimeout(() => document.getElementById('prog-name-inp').focus(), 300)
+}
+
+function renderColorRow() {
+  const row = document.getElementById('color-row')
+  row.innerHTML = ''
+  COLORS.forEach(c => {
+    const d = document.createElement('div')
+    d.className = 'color-dot' + (c.hex === selColor ? ' sel' : '')
+    d.style.background = c.hex
+    d.onclick = () => { selColor = c.hex; renderColorRow() }
+    row.appendChild(d)
+  })
+}
+
+function closeSheet(e) {
+  if (e.target.id === 'add-sheet') document.getElementById('add-sheet').style.display = 'none'
+}
+
+async function saveProgram() {
+  const name = document.getElementById('prog-name-inp').value.trim()
+  if (!name) { toast('請輸入名稱'); return }
+  const prog = {
+    id: uid(), name, color: selColor,
+    order: programs.length, count: 0,
+    lastMsg: '', lastAt: Date.now(), createdAt: Date.now()
+  }
+  await DB.saveProgram(prog)
+  document.getElementById('add-sheet').style.display = 'none'
+  await loadPrograms()
+  toast('✓ Program 建立完成')
+}
+
+async function confirmDelete(prog) {
+  if (!confirm(`刪除「${prog.name}」？\n所有內容也會一起刪除，無法恢復。`)) return
+  await DB.deleteProgram(prog.id)
+  if (currentProg && currentProg.id === prog.id) currentProg = null
+  await loadPrograms()
+  toast('已刪除')
+}
+
+// ═══════════════════════════════════════
+//  CHAT
+// ═══════════════════════════════════════
+async function openChat(prog) {
+  currentProg = prog
+  document.getElementById('chat-name').textContent = prog.name
+  document.getElementById('chat-dot').style.background = prog.color
+  messages = await DB.getMessages(prog.id)
+  document.getElementById('chat-sub').textContent = `${messages.length} 條靈感`
+  renderMessages()
+  goPage(1)
+  setTimeout(() => scrollBottom(), 100)
+}
+
+function renderMessages() {
+  const el = document.getElementById('messages')
+  if (!messages.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">${currentProg ? currentProg.name.slice(0,1) : '✨'}</div><div class="empty-text">還沒有靈感<br>輸入第一條試試看</div></div>`
+    return
+  }
+  el.innerHTML = ''
+  let lastDate = ''
+  messages.forEach(msg => {
+    const d = new Date(msg.createdAt)
+    const dateStr = d.toLocaleDateString('zh-TW', {month:'long',day:'numeric',weekday:'short'})
+    if (dateStr !== lastDate) {
+      const sep = document.createElement('div')
+      sep.className = 'date-sep'
+      sep.innerHTML = `<span>${dateStr}</span>`
+      el.appendChild(sep)
+      lastDate = dateStr
+    }
+    const g = document.createElement('div')
+    g.className = 'msg-group'
+    g.dataset.id = msg.id
+
+    const time = document.createElement('div')
+    time.className = 'msg-time'
+    time.textContent = fmtClock(msg.createdAt)
+    g.appendChild(time)
+
+    const bubble = document.createElement('div')
+    bubble.className = 'msg-bubble'
+
+    if (msg.type === 'image') {
+      const img = document.createElement('img')
+      img.className = 'msg-img'
+      img.src = msg.data
+      img.onclick = () => viewImg(msg.data)
+      bubble.appendChild(img)
+      if (msg.content) { const t = document.createElement('div'); t.textContent = msg.content; bubble.appendChild(t) }
+    } else if (msg.type === 'audio') {
+      const au = document.createElement('div')
+      au.className = 'msg-audio'
+      au.innerHTML = `
+        <div class="aud-play" onclick="playAudio(this,'${msg.id}')">▶</div>
+        <div class="aud-track"><audio id="au-${msg.id}" src="${msg.data}" preload="metadata"></audio></div>
+        <div class="aud-dur" id="dur-${msg.id}">${msg.duration || '0:00'}</div>`
+      bubble.appendChild(au)
+    } else {
+      bubble.textContent = msg.content
+      // extract #tags
+      const tags = msg.content.match(/#[一-龥\w]+/g)
+      if (tags) {
+        bubble.innerHTML = msg.content.replace(/#([一-龥\w]+)/g, '<span class="tag">#$1</span>')
+      }
+    }
+
+    // long press to delete
+    let pressTimer
+    bubble.addEventListener('touchstart', () => { pressTimer = setTimeout(() => { if(confirm('刪除這條？')) delMsg(msg.id) }, 600) }, {passive:true})
+    bubble.addEventListener('touchend', () => clearTimeout(pressTimer), {passive:true})
+    bubble.addEventListener('touchmove', () => clearTimeout(pressTimer), {passive:true})
+
+    g.appendChild(bubble)
+    el.appendChild(g)
+  })
+}
+
+async function delMsg(id) {
+  if (!currentProg) return
+  await DB.deleteMessage(id, currentProg.id)
+  messages = messages.filter(m => m.id !== id)
+  document.getElementById('chat-sub').textContent = `${messages.length} 條靈感`
+  renderMessages()
+  await loadPrograms()
+}
+
+function scrollBottom() {
+  const el = document.getElementById('messages')
+  el.scrollTop = el.scrollHeight
+}
+
+// ── SEND TEXT ──
+async function sendText() {
+  const f = document.getElementById('txt')
+  const txt = f.value.trim()
+  if (!txt || !currentProg) { if (!currentProg) toast('請先選擇一個 Program'); return }
+  const msg = { id: uid(), programId: currentProg.id, type: 'text', content: txt, createdAt: Date.now() }
+  await DB.saveMessage(msg)
+  messages.push(msg)
+  renderMessages()
+  f.value = ''; f.style.height = 'auto'
+  document.getElementById('chat-sub').textContent = `${messages.length} 條靈感`
+  await loadPrograms()
+  scrollBottom()
+}
+
+function onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText() } }
+function grow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px' }
+
+// ── PICK IMAGE ──
+function pickImage() {
+  if (!currentProg) { toast('請先選擇一個 Program'); return }
+  const inp = document.createElement('input')
+  inp.type = 'file'; inp.accept = 'image/*'
+  inp.onchange = async e => {
+    const file = e.target.files[0]; if (!file) return
+    // compress if large
+    const data = await readFileAsDataURL(file, true)
+    const msg = { id: uid(), programId: currentProg.id, type: 'image', data, content: '', createdAt: Date.now() }
+    await DB.saveMessage(msg)
+    messages.push(msg)
+    renderMessages()
+    document.getElementById('chat-sub').textContent = `${messages.length} 條靈感`
+    await loadPrograms()
+    scrollBottom()
+  }
+  inp.click()
+}
+
+function readFileAsDataURL(file, compress = false) {
+  return new Promise(res => {
+    if (!compress || file.size < 500000) {
+      const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file)
+    } else {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const max = 1200
+        let w = img.width, h = img.height
+        if (w > max) { h = h * max / w; w = max }
+        if (h > max) { w = w * max / h; h = max }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        res(canvas.toDataURL('image/jpeg', 0.8))
+      }
+      img.src = URL.createObjectURL(file)
+    }
+  })
+}
+
+// ── RECORD AUDIO ──
+async function toggleRecord() {
+  if (!currentProg) { toast('請先選擇一個 Program'); return }
+  if (!isRec) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaRec = new MediaRecorder(stream)
+      recChunks = []
+      mediaRec.ondataavailable = e => recChunks.push(e.data)
+      mediaRec.onstop = async () => {
+        const blob = new Blob(recChunks, { type: 'audio/webm' })
+        const data = await readFileAsDataURL(blob)
+        const dur = await getAudioDuration(blob)
+        const msg = { id: uid(), programId: currentProg.id, type: 'audio', data, duration: fmtDuration(dur), createdAt: Date.now() }
+        await DB.saveMessage(msg)
+        messages.push(msg)
+        renderMessages()
+        document.getElementById('chat-sub').textContent = `${messages.length} 條靈感`
+        await loadPrograms()
+        scrollBottom()
+        stream.getTracks().forEach(t => t.stop())
+      }
+      mediaRec.start()
+      isRec = true
+      document.getElementById('mic-btn').classList.add('rec')
+      document.getElementById('rec-hint').style.display = 'block'
+    } catch { toast('無法存取麥克風') }
+  } else {
+    mediaRec.stop()
+    isRec = false
+    document.getElementById('mic-btn').classList.remove('rec')
+    document.getElementById('rec-hint').style.display = 'none'
+  }
+}
+
+function getAudioDuration(blob) {
+  return new Promise(res => {
+    const au = new Audio(); au.src = URL.createObjectURL(blob)
+    au.onloadedmetadata = () => res(au.duration)
+    au.onerror = () => res(0)
+  })
+}
+
+function playAudio(btn, id) {
+  const au = document.getElementById('au-' + id)
+  if (!au) return
+  if (au.paused) { au.play(); btn.textContent = '⏸' }
+  else { au.pause(); btn.textContent = '▶' }
+  au.onended = () => { btn.textContent = '▶' }
+}
+
+// ── IMAGE VIEWER ──
+function viewImg(src) {
+  document.getElementById('img-viewer-src').src = src
+  document.getElementById('img-viewer').style.display = 'flex'
+}
+function closeImgViewer() { document.getElementById('img-viewer').style.display = 'none' }
+
+// ═══════════════════════════════════════
+//  ORGANISE PAGE
+// ═══════════════════════════════════════
+let selSources = new Set()
+
+function renderSourceChips() {
+  const el = document.getElementById('source-chips')
+  el.innerHTML = ''
+  programs.forEach(prog => {
+    const chip = document.createElement('div')
+    chip.className = 's-chip' + (selSources.has(prog.id) ? ' on' : '')
+    chip.innerHTML = `<div class="s-chip-dot" style="background:${prog.color}"></div><div class="s-chip-name">${esc(prog.name)}</div><div class="s-chip-n">${prog.count||0}</div>`
+    chip.onclick = () => {
+      selSources.has(prog.id) ? selSources.delete(prog.id) : selSources.add(prog.id)
+      chip.classList.toggle('on')
+      renderMindMap()
+    }
+    el.appendChild(chip)
+  })
+}
+
+async function renderOrg() {
+  renderSourceChips()
+  renderMindMap()
+}
+
+async function renderMindMap() {
+  const svg = document.getElementById('mm-svg')
+  if (!selSources.size) {
+    svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="rgba(255,255,255,.2)" font-size="12" font-family="Inter">選擇上方的 Program 來源</text>`
+    return
+  }
+  // gather messages from selected sources
+  const allMsgs = []
+  for (const pid of selSources) {
+    const msgs = await DB.getMessages(pid)
+    allMsgs.push(...msgs.filter(m => m.type === 'text').slice(-4))
+  }
+  const W = svg.clientWidth || 320, H = 150
+  const cx = W / 2, cy = H / 2
+  const prog = programs.find(p => selSources.has(p.id))
+  const centerLabel = prog ? prog.name : '靈感'
+  let svgHTML = ''
+  const nodes = allMsgs.slice(0, 6)
+  nodes.forEach((msg, i) => {
+    const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2
+    const r = 58
+    const nx = cx + Math.cos(angle) * r
+    const ny = cy + Math.sin(angle) * r
+    const label = msg.content.slice(0, 8)
+    svgHTML += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="rgba(255,255,255,.12)" stroke-width="1.5"/>`
+    svgHTML += `<rect x="${nx-28}" y="${ny-12}" width="56" height="24" rx="12" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.15)" stroke-width="1"/>`
+    svgHTML += `<text x="${nx}" y="${ny+4}" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="10" font-family="Inter">${label}</text>`
+  })
+  svgHTML += `<ellipse cx="${cx}" cy="${cy}" rx="38" ry="18" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.3)" stroke-width="1"/>`
+  svgHTML += `<text x="${cx}" y="${cy+4}" text-anchor="middle" fill="white" font-size="11" font-weight="600" font-family="Inter">${esc(centerLabel)}</text>`
+  svg.innerHTML = svgHTML
+}
+
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2) }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+function fmtTime(ts) {
+  if (!ts) return ''
+  const diff = Date.now() - ts
+  if (diff < 60000) return '剛剛'
+  if (diff < 3600000) return Math.floor(diff/60000) + ' 分鐘前'
+  if (diff < 86400000) return Math.floor(diff/3600000) + ' 小時前'
+  if (diff < 604800000) return Math.floor(diff/86400000) + ' 天前'
+  return new Date(ts).toLocaleDateString('zh-TW', {month:'numeric',day:'numeric'})
+}
+
+function fmtClock(ts) {
+  const d = new Date(ts)
+  const h = d.getHours(), m = d.getMinutes()
+  const ap = h >= 12 ? '下午' : '上午'
+  const hh = h > 12 ? h - 12 : h || 12
+  return `${ap} ${hh}:${String(m).padStart(2,'0')}`
+}
+
+function fmtDuration(sec) {
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60)
+  return `${m}:${String(s).padStart(2,'0')}`
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast')
+  el.textContent = msg; el.classList.add('show')
+  setTimeout(() => el.classList.remove('show'), 2200)
+}
+
+// STATUS BAR CLOCK
+function updateClock() {
+  const t = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit',hour12:false})
+  document.querySelectorAll('[id^="sb-time"]').forEach(el => el.textContent = t)
+}
+updateClock(); setInterval(updateClock, 30000)
+
+// ── PWA SERVICE WORKER ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {})
+}
+
+// ── INIT ──
+goPage(1)
+loadPrograms()
+</script>
+</body>
+</html>

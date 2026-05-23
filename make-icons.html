@@ -1,0 +1,18 @@
+<!DOCTYPE html><html><body>
+<canvas id="c" width="512" height="512"></canvas>
+<script>
+const c = document.getElementById('c').getContext('2d')
+// background
+const g = c.createLinearGradient(0,0,512,512)
+g.addColorStop(0,'#1a3a6e'); g.addColorStop(1,'#0d3320')
+c.fillStyle = g; c.roundRect(0,0,512,512,100); c.fill()
+// sparkle ✨ text
+c.font = 'bold 260px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'
+c.fillText('✦', 256, 270)
+// download 192
+const c2 = document.createElement('canvas'); c2.width = 192; c2.height = 192
+c2.getContext('2d').drawImage(document.getElementById('c'),0,0,192,192)
+const a = document.createElement('a'); a.download='icon-192.png'; a.href=c2.toDataURL(); a.click()
+// download 512
+const a2 = document.createElement('a'); a2.download='icon-512.png'; a2.href=document.getElementById('c').toDataURL(); a2.click()
+</script></body></html>
