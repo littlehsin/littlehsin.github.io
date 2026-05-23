@@ -1,6 +1,6 @@
 // Capture Service Worker — 讓 App 離線也能用
 const CACHE = 'capture-v1'
-const ASSETS = ['/capture-app/', '/capture-app/index.html', '/capture-app/manifest.json']
+const ASSETS = ['/', '/index.html', '/manifest.json']
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)))
