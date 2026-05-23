@@ -1,5 +1,5 @@
 // Capture Service Worker — 讓 App 離線也能用
-const CACHE = 'capture-v1'
+const CACHE = 'capture-v2'
 const ASSETS = ['/', '/index.html', '/manifest.json']
 
 self.addEventListener('install', e => {
